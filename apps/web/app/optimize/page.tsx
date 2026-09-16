@@ -192,7 +192,7 @@ export default function OptimizePage() {
         {/* --- Inputs ------------------------------------------------------------- */}
         <div className="flex flex-col gap-6">
           <Panel title="Facility">
-            <Field label="Facility" htmlFor="facility">
+            <Field label="Facility">
               <Select
                 id="facility"
                 value={facilityId}
@@ -262,14 +262,14 @@ export default function OptimizePage() {
 
           <Panel title="Objective">
             <div className="flex flex-col gap-3">
-              <Field label="Scenario name" htmlFor="scenario-name">
+              <Field label="Scenario name">
                 <Input
                   id="scenario-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />
               </Field>
-              <Field label="Mode" htmlFor="objective">
+              <Field label="Mode">
                 <Select
                   id="objective"
                   value={objective}
@@ -283,7 +283,6 @@ export default function OptimizePage() {
               {objective === "balanced" && (
                 <Field
                   label="Carbon price (USD / tCO2e)"
-                  htmlFor="carbon-price"
                   hint="Priced before combining, so dollars are never added to tonnes."
                 >
                   <Input

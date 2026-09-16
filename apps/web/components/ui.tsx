@@ -85,33 +85,39 @@ export function Button({
   return <button className={cx(base, variants[variant], className)} {...props} />;
 }
 
+/**
+ * A labelled control.
+ *
+ * The control is wrapped *inside* the `<label>` rather than referenced by `htmlFor`, so
+ * the association is implicit and cannot be forgotten. Several call sites render a label
+ * without an id, which produced controls that looked labelled but were announced as
+ * unlabelled by a screen reader.
+ */
 export function Field({
   label,
   hint,
   error,
-  htmlFor,
   children,
   className,
 }: {
   label: string;
   hint?: string;
   error?: string;
-  htmlFor?: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cx("flex flex-col gap-1", className)}>
-      <label htmlFor={htmlFor} className="text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+    <label className={cx("flex flex-col gap-1", className)}>
+      <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
         {label}
-      </label>
+      </span>
       {children}
       {error ? (
-        <p className="text-xs text-loss">{error}</p>
+        <span className="text-xs text-loss">{error}</span>
       ) : hint ? (
-        <p className="text-xs text-ink-faint">{hint}</p>
+        <span className="text-xs text-ink-faint">{hint}</span>
       ) : null}
-    </div>
+    </label>
   );
 }
 
