@@ -86,6 +86,17 @@ deviations are recorded rather than silently absorbed.
 | Pydantic models for the problem definition | Frozen dataclasses | Pydantic wraps semantic validation errors in a generic `ValidationError`, which hides the reason a problem is unusable. The API layer still uses Pydantic for HTTP contracts. |
 | `pandas` for CSV processing | Standard-library `csv` | Ingestion needs precise control over error reporting per row. `pandas` coerces types silently, which conflicts with the requirement to reject rather than repair. |
 | Background job queue for optimization | Synchronous solve with a concurrency semaphore | A 24-hour solve takes single-digit milliseconds. The brief itself allows this: a queue is only warranted once solver time affects the user experience. |
+| No delete operations | `DELETE` for facilities, datasets, and scenarios | The brief listed no removal endpoints, but a tool that can only accumulate data cannot correct a mistake. Deletes refuse while dependents exist and report what stands in the way, so removing something is never accidental. |
+
+## Beyond the brief
+
+Two capabilities were added because the brief's own goals implied them:
+
+- **Carbon-price sweep** (`POST /scenarios/{id}/explore`). The brief asked for "a scatter
+  plot of cost versus emissions across different carbon-price assumptions". Producing that
+  from saved results alone would have required persisting an experiment per point, so the
+  sweep solves in memory and persists nothing.
+- **Deletion.** See the table above.
 
 ## Success definition
 

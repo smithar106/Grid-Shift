@@ -190,3 +190,90 @@ def test_get_session_closes_the_session(monkeypatch: pytest.MonkeyPatch) -> None
     with pytest.raises(StopIteration):
         next(generator)
     assert closed == [True]
+
+
+def test_sqlite_foreign_keys_are_enforced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SQLite disables foreign keys by default, so ON DELETE CASCADE would silently not
+    fire in development while working in production."""
+
+    from app.config import get_settings
+    from app.services.db import get_engine, reset_engine_cache
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'fk.db'}")
+    get_settings.cache_clear()
+    reset_engine_cache()
+
+    try:
+        engine = get_engine()
+        with engine.connect() as connection:
+            enabled = connection.exec_driver_sql("PRAGMA foreign_keys").scalar()
+        assert enabled == 1
+    finally:
+        reset_engine_cache()
+        get_settings.cache_clear()
+
+
+def test_deleting_a_scenario_cascades_to_its_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercises the real engine rather than the overridden test session."""
+    from app.config import get_settings
+    from app.models.scenario import OptimizationResultRecord, Scenario, ScenarioWorkload
+    from app.services.db import get_engine, get_session_factory, reset_engine_cache
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'cascade.db'}")
+    get_settings.cache_clear()
+    reset_engine_cache()
+
+    try:
+        engine = get_engine()
+        Base.metadata.create_all(engine)
+        session = get_session_factory()()
+
+        facility = Facility(
+            name="Cascade", location_id="facility_cascade", timezone="UTC", capacity_mw=10.0
+        )
+        session.add(facility)
+        session.flush()
+        scenario = Scenario(
+            facility_id=facility.id,
+            name="Cascade scenario",
+            objective="cost",
+            dataset_ids=[],
+            workloads=[
+                ScenarioWorkload(
+                    job_id="a", energy_mwh=1.0, release_hour=0, deadline_hour=1, max_mw=1.0
+                )
+            ],
+        )
+        session.add(scenario)
+        session.commit()
+
+        session.add(OptimizationResultRecord(scenario_id=scenario.id, solver_status="optimal"))
+        session.commit()
+
+        scenario_id = scenario.id
+        session.delete(scenario)
+        session.commit()
+        session.expire_all()
+
+        from sqlalchemy import select
+
+        assert (
+            session.scalars(
+                select(ScenarioWorkload).where(ScenarioWorkload.scenario_id == scenario_id)
+            ).all()
+            == []
+        )
+        assert (
+            session.scalars(
+                select(OptimizationResultRecord).where(
+                    OptimizationResultRecord.scenario_id == scenario_id
+                )
+            ).all()
+            == []
+        )
+        session.close()
+    finally:
+        reset_engine_cache()
+        get_settings.cache_clear()

@@ -107,6 +107,25 @@ always be re-derived from the snapshot it names.
 `original_*` columns (what the user actually wrote). Without that, a result could not be
 traced back to the file it came from.
 
+### Deletion
+
+Deletes are the one operation that cannot be undone, so the rules are explicit rather than
+convenient:
+
+| Delete | Behaviour |
+| --- | --- |
+| Scenario | Always allowed. A scenario is derived from its datasets, which are kept, so it can be recreated. Results and allocations cascade. |
+| Dataset | Refused (409) while a scenario names it, because deleting the evidence behind a saved result would break reproducibility. `?force=true` overrides. Observations cascade. |
+| Facility | Refused (409) while scenarios or datasets reference it, reporting the counts. `?force=true` deletes its scenarios and detaches its datasets rather than deleting them. |
+
+Datasets store their scenario references as a JSON list, so the dataset check is done in
+Python rather than by a foreign key.
+
+SQLite disables foreign-key enforcement by default, which means `ON DELETE CASCADE` would
+silently not fire in development while working in PostgreSQL. `app/services/db.py` sets
+`PRAGMA foreign_keys=ON` on every SQLite connection, and a test asserts it, so the two
+environments behave the same way.
+
 ## Frontend
 
 Four screens, all client components that read through the same-origin proxy.
@@ -127,9 +146,9 @@ not support `var()`.
 | --- | --- | --- |
 | `tests/optimization/` | 88 | The model: feasibility, optimality, baseline, edge cases. 100% branch coverage. |
 | `tests/test_csv_ingest.py` | 48 | Ingestion, unit canonicalization, DST, duplicates, gaps, multi-location rejection |
-| `tests/test_api_*.py` | 56 | HTTP contracts, guards, and the end-to-end scenario flow |
+| `tests/test_api_*.py` | 69 | HTTP contracts, guards, deletes, and the end-to-end scenario flow |
 | `tests/test_open_meteo.py` | 17 | Connector normalization, caching, failure modes |
-| other API suites | 49 | Scenario assembly, timezone handling, engine wiring, settings, probes |
+| other API suites | 51 | Scenario assembly, timezone handling, engine wiring, settings, probes |
 | `apps/web/tests/` | 16 | API client and formatting |
 | `tests/optimization/` coverage gate | — | CI fails below 90% |
 

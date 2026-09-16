@@ -463,3 +463,16 @@ def export_results(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{stem}.csv"'},
     )
+
+
+@router.delete("/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_scenario(scenario_id: UUID, session: Session = Depends(get_session)) -> Response:
+    """Delete a scenario with its workloads, results, and allocations.
+
+    No confirmation is required: a scenario is derived from its datasets, which are kept,
+    so it can always be recreated. Nothing irreplaceable is lost.
+    """
+    scenario = _get_scenario(session, scenario_id)
+    session.delete(scenario)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

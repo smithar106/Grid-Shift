@@ -156,14 +156,14 @@ make typecheck      # mypy + tsc
 | --- | --- | --- |
 | `tests/optimization/` | 88 | The model: feasibility, optimality, baseline, DST, negative prices. **100% branch coverage**, gated at 90% in CI. |
 | `tests/test_csv_ingest.py` | 48 | Unit canonicalization, duplicates, gaps, timezones, checksums, multi-location rejection |
-| `tests/test_api_*.py` | 56 | HTTP contracts, guards, and the end-to-end scenario flow |
+| `tests/test_api_*.py` | 69 | HTTP contracts, guards, deletes, and the end-to-end scenario flow |
 | `tests/test_open_meteo.py` | 17 | Connector normalization, caching, failure modes |
 | `tests/test_scenario_builder.py` | 15 | Dataset assembly, ambiguity, horizon intersection |
 | `tests/test_timeutil.py` | 12 | UTC normalization and daylight-saving transitions |
-| `tests/test_db_types.py` | 11 | Timezone-safe columns, engine and session wiring |
+| `tests/test_db_types.py` | 13 | Timezone-safe columns, engine wiring, foreign-key enforcement |
 | `tests/test_config.py`, `tests/test_health.py` | 11 | Settings parsing, probes |
 | `apps/web/tests/` | 16 | API client and formatting |
-| **Total** | **274** | |
+| **Total** | **289** | |
 
 The essential optimization tests from the brief are covered directly: constant prices produce
 a hand-checkable objective value; cheaper hours receive flexible demand; an impossible

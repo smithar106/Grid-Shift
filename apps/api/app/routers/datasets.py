@@ -9,12 +9,23 @@ from __future__ import annotations
 from itertools import pairwise
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.dataset import Dataset, HourlyObservation
 from app.models.facility import Facility
+from app.models.scenario import Scenario
 from app.schemas.api import DatasetOut
 from app.schemas.enums import Metric, Unit
 from app.schemas.ingestion import SeriesSummary
@@ -187,3 +198,45 @@ def get_dataset(dataset_id: UUID, session: Session = Depends(get_session)) -> Da
     payload = DatasetOut.model_validate(dataset)
     payload.series = summarize_dataset(dataset)
     return payload
+
+
+@router.delete("/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_dataset(
+    dataset_id: UUID,
+    force: bool = Query(
+        default=False,
+        description="Delete even if a scenario still references this dataset.",
+    ),
+    session: Session = Depends(get_session),
+) -> Response:
+    """Delete a dataset and its observations.
+
+    Refuses while a scenario names it, because deleting the evidence behind a saved
+    result would make that result no longer reproducible. Scenarios store their dataset
+    ids as JSON, so this is checked in Python rather than with a foreign key.
+    """
+    dataset = session.get(Dataset, dataset_id)
+    if dataset is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No dataset with id {dataset_id}.",
+        )
+
+    referencing = [
+        scenario
+        for scenario in session.scalars(select(Scenario))
+        if str(dataset_id) in (scenario.dataset_ids or [])
+    ]
+    if referencing and not force:
+        names = ", ".join(repr(scenario.name) for scenario in referencing[:3])
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Dataset {dataset_id} is used by {len(referencing)} scenario(s): {names}. "
+                "Delete those scenarios first, or retry with ?force=true."
+            ),
+        )
+
+    session.delete(dataset)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
