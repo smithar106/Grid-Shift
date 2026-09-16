@@ -192,13 +192,15 @@ A scenario is reproducible because:
 
 ## 10. Measured performance
 
-On the development machine (Apple silicon), with `SOLVER_TIME_LIMIT_SECONDS=5`:
+On the development machine (Apple silicon), with `SOLVER_TIME_LIMIT_SECONDS=5`. Figures
+are the median of five runs of the full `solve()` call:
 
 | Scenario | Variables | Solve time |
 | --- | --- | --- |
-| 24 hours, 1 workload | 24 | 1.3 ms |
+| 24 hours, 1 workload | 24 | 1.4 ms |
 | 24 hours, 10 workloads | 240 | 2.1 ms |
-| 168 hours, 100 workloads | 16,800 | 80 ms |
+| 336 hours (the shipped sample), 2 workloads | 672 | 4.5 ms |
+| 168 hours, 60 workloads | 10,080 | 53 ms |
 
 The target is a 24-hour scenario in under 5 seconds; the observed figure is roughly three
 orders of magnitude inside it. Figures are the median of seven runs of the full `solve()`

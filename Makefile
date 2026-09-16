@@ -54,8 +54,8 @@ build: ## Production build of the frontend
 migrate: ## Apply database migrations
 	cd $(API_DIR) && .venv/bin/alembic upgrade head
 
-sample-data: ## Regenerate the synthetic sample facility datasets
-	cd $(API_DIR) && .venv/bin/python scripts/generate_sample_data.py --hours 168
+sample-data: ## Regenerate the synthetic sample facility dataset (336h, 1008 rows)
+	cd $(API_DIR) && .venv/bin/python scripts/generate_sample_data.py
 
 seed: ## Load the sample facility, dataset and scenarios into a running API
 	cd $(API_DIR) && .venv/bin/python scripts/seed_sample.py

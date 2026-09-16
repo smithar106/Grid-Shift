@@ -8,8 +8,7 @@ import { getHealth } from "@/lib/api";
 import { cx } from "@/components/ui";
 
 const LINKS = [
-  { href: "/", label: "Overview" },
-  { href: "/optimize", label: "Optimize" },
+  { href: "/", label: "Optimize" },
   { href: "/scenarios", label: "Scenarios" },
   { href: "/data", label: "Data" },
 ] as const;
@@ -70,6 +69,7 @@ export function TopNav() {
           {LINKS.map((link) => {
             const active =
               link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+
             return (
               <Link
                 key={link.href}

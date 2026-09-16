@@ -30,27 +30,40 @@ FACILITY = {
     "capacity_mw": 38.0,
 }
 
-WORKLOADS = [
+#: Hour index 0 is Monday 00:00 UTC in the generated sample.
+HOURS_PER_DAY = 24
+FORTNIGHT = 14 * HOURS_PER_DAY
+
+#: A large training job with a fortnight to run in, and an inference batch with a week.
+FLEXIBLE_WORKLOADS = [
     {
         "job_id": "model-training",
-        "energy_mwh": 150.0,
+        "energy_mwh": 1200.0,
         "release_hour": 0,
-        "deadline_hour": 23,
-        "max_mw": 22.0,
+        "deadline_hour": FORTNIGHT - 1,
+        "max_mw": 30.0,
     },
     {
         "job_id": "batch-inference",
-        "energy_mwh": 60.0,
-        "release_hour": 6,
-        "deadline_hour": 22,
-        "max_mw": 9.0,
+        "energy_mwh": 400.0,
+        "release_hour": 0,
+        "deadline_hour": FORTNIGHT - 1,
+        "max_mw": 12.0,
     },
 ]
 
+#: The same work, but the training job must finish inside the first three days. Comparing
+#: this against the unconstrained runs is the point: flexibility has a price.
+CONSTRAINED_WORKLOADS = [
+    {**FLEXIBLE_WORKLOADS[0], "deadline_hour": 3 * HOURS_PER_DAY - 1},
+    FLEXIBLE_WORKLOADS[1],
+]
+
 SCENARIOS = [
-    ("Cost-optimized schedule", "cost", 0.0),
-    ("Carbon-optimized schedule", "emissions", 0.0),
-    ("Balanced at 80 USD per tonne", "balanced", 80.0),
+    ("Cost-optimized fortnight", "cost", 0.0, FLEXIBLE_WORKLOADS),
+    ("Carbon-optimized fortnight", "emissions", 0.0, FLEXIBLE_WORKLOADS),
+    ("Balanced at 80 USD per tonne", "balanced", 80.0, FLEXIBLE_WORKLOADS),
+    ("Cost-optimized, 3-day deadline", "cost", 0.0, CONSTRAINED_WORKLOADS),
 ]
 
 
@@ -62,7 +75,13 @@ def fail(message: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--api", default="http://127.0.0.1:8000", help="API base URL.")
-    parser.add_argument("--hours", type=int, default=24, choices=[24, 168])
+    parser.add_argument(
+        "--hours",
+        type=int,
+        default=336,
+        choices=[24, 168, 336],
+        help="Which generated sample to load (default: 336, i.e. 14 days).",
+    )
     args = parser.parse_args()
 
     base = f"{args.api.rstrip('/')}/api/v1"
@@ -110,7 +129,7 @@ def main() -> None:
             f"{len(dataset['metrics'])} metrics, checksum {dataset['checksum'][:10]}"
         )
 
-        for name, objective, carbon_price in SCENARIOS:
+        for name, objective, carbon_price, workloads in SCENARIOS:
             response = client.post(
                 f"{base}/scenarios",
                 json={
@@ -119,7 +138,7 @@ def main() -> None:
                     "objective": objective,
                     "carbon_price_usd_per_tco2e": carbon_price,
                     "dataset_ids": [dataset["id"]],
-                    "workloads": WORKLOADS,
+                    "workloads": workloads,
                 },
             )
             if response.status_code != 201:

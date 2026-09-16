@@ -128,12 +128,20 @@ environments behave the same way.
 
 ## Frontend
 
-Four screens, all client components that read through the same-origin proxy.
+Three screens, all client components that read through the same-origin proxy. Each has a
+single job, and controls that do not serve that job were removed rather than tucked away.
 
-- **Overview** — setup state, facility, data coverage, latest result
-- **Optimize** — inputs and results side by side, plus the trade-off frontier
-- **Scenarios** — run, inspect, export, compare
-- **Data** — facilities, dataset upload, weather
+- **Optimize** (`/`) — the workflow: numbered steps for inputs, workloads, and objective;
+  one primary action; then the result, the schedule, and progressively-disclosed detail.
+  It also lands on the most recent scenario so the screen shows value immediately.
+- **Scenarios** — every saved run, one detail panel at a time, and a side-by-side
+  comparison of two to four runs.
+- **Data** — the facility and the hourly series. Weather is a collapsed aside, because it
+  does not affect the objective.
+
+Long horizons change how the schedule is drawn. Above 96 hours the chart and the workload
+placement grid aggregate to days: 336 hourly bars is an unreadable smear, and at a
+fortnight the useful question is which days took the work, not which hour.
 
 Design tokens live in `app/globals.css` and every colour resolves through them, so dark mode
 is a single override block rather than a per-component concern. Chart colours are read from
@@ -149,7 +157,7 @@ not support `var()`.
 | `tests/test_api_*.py` | 69 | HTTP contracts, guards, deletes, and the end-to-end scenario flow |
 | `tests/test_open_meteo.py` | 17 | Connector normalization, caching, failure modes |
 | other API suites | 51 | Scenario assembly, timezone handling, engine wiring, settings, probes |
-| `apps/web/tests/` | 16 | API client and formatting |
+| `apps/web/tests/` | 24 | API client, formatting, horizon bucketing |
 | `tests/optimization/` coverage gate | — | CI fails below 90% |
 
 Overall API statement coverage is 97%.

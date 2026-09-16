@@ -83,15 +83,20 @@ GridShift has no access to proprietary data-center telemetry, so the shipped sam
 synthetic and labelled as such.
 
 - Generator: `apps/api/scripts/generate_sample_data.py`
-- Output: `data/synthetic/sample_facility_24h.csv`, `sample_facility_168h.csv`
+- Output: `data/synthetic/sample_facility_336h.csv` (default), or `--hours 24|168|336`
 - Seeder: `apps/api/scripts/seed_sample.py`
+
+The default is a **fortnight**: 336 hourly intervals across 3 metrics, 1,008 rows. A fortnight
+is long enough that day-of-week effects and day-to-day volatility are real, which makes
+cross-day shifting a genuine decision rather than a toy one.
 
 The profile has a morning ramp and an evening peak, so the earliest-feasible baseline is
 genuinely suboptimal. A flat curve would make every objective agree and would hide whether
 the comparison works.
 
-The generator uses a fixed start date and no random seed, so the published CSV is stable and
-the README's figures can be reproduced exactly.
+The generator uses a fixed start date (a Monday) and a hash-based pseudo-random rather than a
+seeded RNG, so the published CSV never changes between runs or machines and the README's
+figures can be reproduced exactly.
 
 ## Validation rules
 

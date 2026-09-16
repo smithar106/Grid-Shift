@@ -49,16 +49,97 @@ export function Panel({
 
 export function PageHeader({
   title,
+  purpose,
   children,
 }: {
   title: string;
+  purpose?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <h1 className="text-lg font-medium tracking-tight text-ink">{title}</h1>
-      {children && <div className="flex items-center gap-2">{children}</div>}
+    <div className="mb-6 border-b border-line pb-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <h1 className="text-lg font-medium tracking-tight text-ink">{title}</h1>
+        {children && <div className="flex items-center gap-2">{children}</div>}
+      </div>
+      {purpose && <p className="mt-1 text-sm text-ink-muted">{purpose}</p>}
     </div>
+  );
+}
+
+/**
+ * A numbered step in a workflow. The number makes the sequence obvious, which a stack of
+ * identically-styled panels does not.
+ */
+export function Step({
+  index,
+  title,
+  purpose,
+  children,
+  action,
+}: {
+  index: number;
+  title: string;
+  purpose?: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <section className="border-t border-line pt-4">
+      <header className="mb-3 flex items-baseline justify-between gap-4">
+        <div className="flex items-baseline gap-2.5">
+          <span
+            aria-hidden
+            className="tnum font-mono text-[11px] text-ink-faint"
+          >
+            {index}
+          </span>
+          <div>
+            <h2 className="text-sm font-medium text-ink">{title}</h2>
+            {purpose && <p className="mt-0.5 text-xs text-ink-muted">{purpose}</p>}
+          </div>
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Progressive disclosure via native `<details>`.
+ *
+ * Used for detail that supports a decision but is not itself the decision: solver
+ * diagnostics, assumptions, the full hourly table. Native details is keyboard-accessible
+ * and needs no state.
+ */
+export function Disclosure({
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  summary?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details className="group border-t border-line pt-3" open={defaultOpen}>
+      <summary className="flex cursor-pointer list-none items-baseline justify-between gap-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-muted">
+          <span
+            aria-hidden
+            className="inline-block text-ink-faint transition-transform group-open:rotate-90"
+          >
+            ›
+          </span>
+          {title}
+        </span>
+        {summary && <span className="text-xs text-ink-faint">{summary}</span>}
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
   );
 }
 

@@ -25,28 +25,37 @@ The optimization engine is the product, not the dashboard. Every recommendation 
 
 ## Measured results
 
-The sample facility below is a synthetic 24-hour profile with a morning ramp and an evening
-peak. The baseline is the deterministic earliest-feasible schedule, which front-loads work
-into the expensive morning hours.
+The sample facility is a synthetic **fortnight** — 336 hourly intervals, 1,008 rows — with a
+morning ramp, an evening peak, and weekday/weekend variation. The baseline is the
+deterministic earliest-feasible schedule, which front-loads work into the expensive morning
+hours.
 
-| Scenario | Optimized cost | Baseline cost | Cost saving | Optimized emissions | Emissions change |
+| Scenario | Optimized cost | Baseline cost | Cost saving | Emissions | Emissions change |
 | --- | --- | --- | --- | --- | --- |
-| Minimize cost | $23,592 | $26,340 | **+10.44%** | 161.15 tCO₂e | +6.68% |
-| Minimize emissions | $23,751 | $26,340 | +9.83% | 160.55 tCO₂e | **+7.03%** |
-| Balanced @ $80/tCO₂e | $23,606 | $26,340 | +10.38% | 160.63 tCO₂e | +6.98% |
+| Cost-optimized fortnight | $282,455 | $317,745 | **+10.77%** | 2,148.9 tCO₂e | +6.16% |
+| Carbon-optimized fortnight | $289,640 | $317,745 | +8.50% | 2,107.9 tCO₂e | **+7.95%** |
+| Balanced @ $80/tCO₂e | $283,313 | $317,745 | +10.50% | 2,127.6 tCO₂e | +7.08% |
+| Cost-optimized, 3-day deadline | $300,840 | $317,745 | +5.32% | 2,220.8 tCO₂e | +3.31% |
 
-Reproduce these figures with `make seed`. Note that emissions mode achieves a *larger*
-emissions reduction at a *slightly higher* cost than cost mode — that trade-off is the point
-of the product, and it is reported rather than smoothed away.
+Reproduce these figures with `make seed`. Three things in that table are the point of the
+product:
+
+- Emissions mode achieves a **larger** emissions reduction at a **higher** cost than cost
+  mode. That trade-off is reported, not smoothed away.
+- The balanced run sits between the two, because pricing carbon is exactly the act of
+  choosing where on the frontier to land.
+- **Tightening one job's deadline from a fortnight to three days halves the saving**
+  (+5.32% vs +10.77%). Flexibility is worth money, and the model prices it.
 
 Solver performance, measured as the median of seven runs of the full `solve()` call on
 Apple silicon with `SOLVER_TIME_LIMIT_SECONDS=5`:
 
 | Scenario | Variables | Median solve time |
 | --- | --- | --- |
-| 24 hours, 1 workload | 24 | 1.3 ms |
+| 24 hours, 1 workload | 24 | 1.4 ms |
 | 24 hours, 10 workloads | 240 | 2.1 ms |
-| 168 hours, 100 workloads | 16,800 | 80 ms |
+| 336 hours (the shipped sample), 2 workloads | 672 | 4.5 ms |
+| 168 hours, 60 workloads | 10,080 | 53 ms |
 
 The requirement was a 24-hour scenario in under 5 seconds. The observed figure is roughly
 three orders of magnitude inside it.
@@ -162,8 +171,8 @@ make typecheck      # mypy + tsc
 | `tests/test_timeutil.py` | 12 | UTC normalization and daylight-saving transitions |
 | `tests/test_db_types.py` | 13 | Timezone-safe columns, engine wiring, foreign-key enforcement |
 | `tests/test_config.py`, `tests/test_health.py` | 11 | Settings parsing, probes |
-| `apps/web/tests/` | 16 | API client and formatting |
-| **Total** | **289** | |
+| `apps/web/tests/` | 24 | API client, formatting, horizon bucketing |
+| **Total** | **297** | |
 
 The essential optimization tests from the brief are covered directly: constant prices produce
 a hand-checkable objective value; cheaper hours receive flexible demand; an impossible

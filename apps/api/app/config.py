@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     # Optimization guardrails
     solver_time_limit_seconds: float = 5.0
     max_workloads: int = 200
-    max_horizon_hours: int = 168
+    #: Two weeks at hourly resolution. The shipped sample uses the full fortnight, so the
+    #: limit has to admit it.
+    max_horizon_hours: int = 336
     max_concurrent_optimizations: int = 4
 
     @property

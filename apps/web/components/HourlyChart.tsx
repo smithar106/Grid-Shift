@@ -12,46 +12,47 @@ import {
   YAxis,
 } from "recharts";
 
+import { isDaily, toBuckets } from "@/lib/buckets";
 import { useChartColors } from "@/lib/useChartColors";
-import { formatMoney, formatNumber, hourLabel } from "@/lib/format";
+import { formatMoney, formatNumber } from "@/lib/format";
 import type { HourlyPoint } from "@/lib/types";
 
 /**
- * Hourly consumption split into fixed and flexible load, with the price that drove the
- * schedule overlaid. The point of the chart is to show *why* the flexible blocks landed
- * where they did, so price and consumption must be visible together.
+ * Where the load lands, against the price that drove it.
+ *
+ * The chart adapts to the horizon: hourly bars up to four days, daily totals beyond that.
+ * A fortnight of hourly bars is an unreadable smear, and at that scale the useful question
+ * is which days took the work, not which hour.
  */
 export function HourlyChart({ points }: { points: HourlyPoint[] }) {
   const colors = useChartColors();
+  const buckets = toBuckets(points);
+  const daily = isDaily(points);
 
-  const data = points.map((point) => ({
-    hour: hourLabel(point.timestamp_utc),
-    fixed: point.baseline_load_mwh,
-    flexible: point.optimized_flexible_mwh,
-    price: point.price_usd_per_mwh,
-    capacity: point.capacity_mwh,
-  }));
+  const unit = daily ? "MWh/day" : "MWh";
+  const priceLabel = daily ? "Avg price" : "Price";
 
   return (
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+        <ComposedChart data={buckets} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
           <CartesianGrid stroke={colors.line} vertical={false} />
           <XAxis
-            dataKey="hour"
+            dataKey="label"
             tick={{ fill: colors.inkFaint, fontSize: 10 }}
             tickLine={false}
             axisLine={{ stroke: colors.line }}
-            interval={1}
+            interval="preserveStartEnd"
+            minTickGap={24}
           />
           <YAxis
             yAxisId="energy"
             tick={{ fill: colors.inkFaint, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
-            width={44}
+            width={48}
             label={{
-              value: "MWh",
+              value: unit,
               angle: -90,
               position: "insideLeft",
               fill: colors.inkFaint,
@@ -85,9 +86,9 @@ export function HourlyChart({ points }: { points: HourlyPoint[] }) {
             labelStyle={{ color: colors.inkMuted }}
             formatter={(value, name) => {
               const numeric = typeof value === "number" ? value : Number(value ?? 0);
-              return name === "Price"
+              return name === priceLabel
                 ? [formatMoney(numeric, true), String(name)]
-                : [`${formatNumber(numeric)} MWh`, String(name)];
+                : [`${formatNumber(numeric)} ${daily ? "MWh" : "MWh"}`, String(name)];
             }}
           />
           <Legend
@@ -111,9 +112,9 @@ export function HourlyChart({ points }: { points: HourlyPoint[] }) {
           />
           <Line
             yAxisId="price"
-            type="stepAfter"
+            type={daily ? "monotone" : "stepAfter"}
             dataKey="price"
-            name="Price"
+            name={priceLabel}
             stroke={colors.inkMuted}
             strokeWidth={1.25}
             strokeDasharray="3 3"
