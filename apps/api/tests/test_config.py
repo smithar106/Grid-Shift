@@ -24,3 +24,19 @@ def test_is_production_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     assert Settings().is_production is True
     monkeypatch.setenv("ENVIRONMENT", "development")
     assert Settings().is_production is False
+
+
+@pytest.mark.parametrize(
+    ("provided", "expected"),
+    [
+        ("postgresql://u:p@host:5432/db", "postgresql+psycopg://u:p@host:5432/db"),
+        ("postgres://u:p@host:5432/db", "postgresql+psycopg://u:p@host:5432/db"),
+        ("postgresql+psycopg://u:p@host:5432/db", "postgresql+psycopg://u:p@host:5432/db"),
+        ("sqlite:///./gridshift.db", "sqlite:///./gridshift.db"),
+    ],
+)
+def test_sqlalchemy_url_selects_psycopg3(
+    monkeypatch: pytest.MonkeyPatch, provided: str, expected: str
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", provided)
+    assert Settings().sqlalchemy_url == expected

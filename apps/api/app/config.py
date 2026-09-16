@@ -47,6 +47,19 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
+    def sqlalchemy_url(self) -> str:
+        """Return a SQLAlchemy URL that selects the psycopg 3 driver.
+
+        Railway (and most providers) inject `postgresql://...`, which SQLAlchemy maps to
+        the psycopg2 driver by default. This project installs psycopg 3, so the scheme is
+        rewritten rather than rewriting the provider-supplied value.
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if self.database_url.startswith(prefix):
+                return "postgresql+psycopg://" + self.database_url[len(prefix) :]
+        return self.database_url
+
+    @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}
 
