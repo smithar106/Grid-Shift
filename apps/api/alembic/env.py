@@ -12,7 +12,8 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.config import get_settings
-from app.models.base import Base
+from app.models import Base  # noqa: F401  (importing the package registers every table)
+from app.models.types import UtcDateTime
 
 config = context.config
 
@@ -24,6 +25,18 @@ config.set_main_option("sqlalchemy.url", get_settings().sqlalchemy_url)
 target_metadata = Base.metadata
 
 
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Render GridShift's custom column types as plain SQLAlchemy types.
+
+    ``UtcDateTime`` is a ``TypeDecorator`` over ``DateTime(timezone=True)``, so the emitted
+    DDL is identical. Rendering the underlying type keeps generated migrations free of
+    application imports and avoids a spurious diff on the next autogenerate pass.
+    """
+    if type_ == "type" and isinstance(obj, UtcDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
@@ -31,6 +44,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -48,6 +62,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             render_as_batch=connection.dialect.name == "sqlite",
+            render_item=render_item,
         )
         with context.begin_transaction():
             context.run_migrations()
