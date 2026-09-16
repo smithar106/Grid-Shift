@@ -6,7 +6,7 @@ WEB_DIR := apps/web
 PY := $(API_DIR)/.venv/bin/python
 PIP := $(API_DIR)/.venv/bin/pip
 
-.PHONY: help setup setup-api setup-web api web dev test test-api test-web lint typecheck build migrate sample-data clean
+.PHONY: help setup setup-api setup-web api web dev test test-api test-web lint typecheck build migrate sample-data seed clean
 
 help: ## Show available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -54,8 +54,11 @@ build: ## Production build of the frontend
 migrate: ## Apply database migrations
 	cd $(API_DIR) && .venv/bin/alembic upgrade head
 
-sample-data: ## Regenerate the synthetic sample facility dataset
-	cd $(API_DIR) && .venv/bin/python scripts/generate_sample_data.py
+sample-data: ## Regenerate the synthetic sample facility datasets
+	cd $(API_DIR) && .venv/bin/python scripts/generate_sample_data.py --hours 168
+
+seed: ## Load the sample facility, dataset and scenarios into a running API
+	cd $(API_DIR) && .venv/bin/python scripts/seed_sample.py
 
 clean: ## Remove build and cache artifacts
 	rm -rf $(API_DIR)/.pytest_cache $(API_DIR)/.ruff_cache $(API_DIR)/.mypy_cache $(API_DIR)/htmlcov $(API_DIR)/.coverage
