@@ -39,13 +39,14 @@ Reproduce these figures with `make seed`. Note that emissions mode achieves a *l
 emissions reduction at a *slightly higher* cost than cost mode — that trade-off is the point
 of the product, and it is reported rather than smoothed away.
 
-Solver performance, measured on Apple silicon with `SOLVER_TIME_LIMIT_SECONDS=5`:
+Solver performance, measured as the median of seven runs of the full `solve()` call on
+Apple silicon with `SOLVER_TIME_LIMIT_SECONDS=5`:
 
-| Scenario | Variables | Solve time |
+| Scenario | Variables | Median solve time |
 | --- | --- | --- |
-| 24 hours, 1 workload | 24 | ~4 ms |
-| 24 hours, 10 workloads | 240 | ~4 ms |
-| 168 hours, 100 workloads | 16,800 | ~84 ms |
+| 24 hours, 1 workload | 24 | 1.3 ms |
+| 24 hours, 10 workloads | 240 | 2.1 ms |
+| 168 hours, 100 workloads | 16,800 | 80 ms |
 
 The requirement was a 24-hour scenario in under 5 seconds. The observed figure is roughly
 three orders of magnitude inside it.
@@ -153,11 +154,16 @@ make typecheck      # mypy + tsc
 
 | Suite | Tests | Scope |
 | --- | --- | --- |
-| `tests/optimization/` | 84 | The model: feasibility, optimality, baseline, DST, negative prices. **100% branch coverage**, gated at 90% in CI. |
-| `tests/test_csv_ingest.py` | 45 | Unit canonicalization, duplicates, gaps, timezones, checksums |
-| `tests/test_api_*.py` | 60 | HTTP contracts and the end-to-end scenario flow |
+| `tests/optimization/` | 88 | The model: feasibility, optimality, baseline, DST, negative prices. **100% branch coverage**, gated at 90% in CI. |
+| `tests/test_csv_ingest.py` | 48 | Unit canonicalization, duplicates, gaps, timezones, checksums, multi-location rejection |
+| `tests/test_api_*.py` | 56 | HTTP contracts, guards, and the end-to-end scenario flow |
 | `tests/test_open_meteo.py` | 17 | Connector normalization, caching, failure modes |
+| `tests/test_scenario_builder.py` | 15 | Dataset assembly, ambiguity, horizon intersection |
+| `tests/test_timeutil.py` | 12 | UTC normalization and daylight-saving transitions |
+| `tests/test_db_types.py` | 11 | Timezone-safe columns, engine and session wiring |
+| `tests/test_config.py`, `tests/test_health.py` | 11 | Settings parsing, probes |
 | `apps/web/tests/` | 16 | API client and formatting |
+| **Total** | **274** | |
 
 The essential optimization tests from the brief are covered directly: constant prices produce
 a hand-checkable objective value; cheaper hours receive flexible demand; an impossible

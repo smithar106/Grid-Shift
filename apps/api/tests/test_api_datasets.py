@@ -139,3 +139,34 @@ def test_rejected_upload_persists_nothing(client: TestClient) -> None:
     upload_dataset(client, csv_text=build_csv(rows))
 
     assert client.get("/api/v1/datasets").json() == []
+
+
+def test_oversized_upload_is_rejected(client: TestClient) -> None:
+    from app.routers.datasets import MAX_UPLOAD_BYTES
+
+    oversized = b"timestamp,metric,value,unit\n" + b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post("/api/v1/datasets", files={"file": ("huge.csv", oversized, "text/csv")})
+
+    assert response.status_code == 413
+    assert "limit is" in response.json()["detail"]
+
+
+def test_multi_location_upload_is_rejected(client: TestClient) -> None:
+    rows = [
+        *hourly_rows("electricity_price", "USD/MWh", [10.0] * 24, location="site_a"),
+        *hourly_rows("electricity_price", "USD/MWh", [99.0] * 24, location="site_b"),
+    ]
+    result = upload_dataset(client, csv_text=build_csv(rows))
+
+    assert result["status_code"] == 422
+    assert any("multiple_locations" in issue for issue in result["body"]["issues"])
+
+
+def test_datasets_can_be_filtered_by_facility(client: TestClient) -> None:
+    facility = create_facility(client)
+    upload_dataset(client, csv_text=sample_dataset_csv(), facility_id=facility["id"])
+    upload_dataset(client, csv_text=sample_dataset_csv())
+
+    filtered = client.get(f"/api/v1/datasets?facility_id={facility['id']}").json()
+    assert len(filtered) == 1
+    assert filtered[0]["facility_id"] == facility["id"]

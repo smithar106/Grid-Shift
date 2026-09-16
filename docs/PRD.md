@@ -35,14 +35,14 @@ infrastructure.
 | # | Criterion | Status | Evidence |
 | --- | --- | --- | --- |
 | 1 | At least one functioning external API integration | **Done** | Open-Meteo connector, `tests/test_open_meteo.py` (17 tests) |
-| 2 | CSV upload and validation | **Done** | `app/services/csv_ingest.py`, 45 tests |
+| 2 | CSV upload and validation | **Done** | `app/services/csv_ingest.py`, 48 tests |
 | 3 | 24-hour optimization with a real solver | **Done** | SciPy `linprog` with HiGHS |
 | 4 | Cost, carbon, and balanced optimization modes | **Done** | `ObjectiveMode`, parametrized tests |
 | 5 | Capacity and deadline constraints enforced | **Done** | Structural + post-solve verification |
 | 6 | Baseline versus optimized comparison | **Done** | Deterministic earliest-feasible baseline |
 | 7 | Interactive hourly visualization | **Done** | Optimize screen, Recharts |
 | 8 | Reproducible scenario results | **Done** | Content checksums, archived snapshots |
-| 9 | Automated optimization tests | **Done** | 84 tests, 100% branch coverage of the model |
+| 9 | Automated optimization tests | **Done** | 88 tests, 100% branch coverage of the model |
 | 10 | One-command local startup | **Done** | `make setup && make api && make web` |
 
 All ten are release requirements, not claims. The criterion most worth checking is #3: every
@@ -103,7 +103,7 @@ This is verified end to end against the production deployment. See the root
 | Reproducibility | Identical input snapshots produce equivalent results | Checksum tests; determinism tests |
 | Reliability | External API errors produce actionable messages | `UpstreamUnavailable` with the upstream reason |
 | Security | API keys stored in environment variables | No key required for Open-Meteo; `.env` is gitignored |
-| Performance | 24-hour scenario solves in under 5 seconds | Measured at ~4 ms |
+| Performance | 24-hour scenario solves in under 5 seconds | Measured at 1.3 ms (median of 7) |
 | Accessibility | Keyboard-accessible controls and readable charts | Semantic tables, labelled controls, focus-visible rings |
 | Testing | ≥90% coverage of optimization-domain code | 100% branch coverage, gated in CI |
 | Documentation | Setup, architecture, equations, limitations | `docs/` |

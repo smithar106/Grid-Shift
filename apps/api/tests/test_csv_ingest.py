@@ -524,3 +524,37 @@ def test_many_errors_are_reported_together() -> None:
         IssueCode.INVALID_VALUE,
     }
     assert len(error.value.issues) >= 3
+
+
+def test_multiple_locations_are_rejected_rather_than_silently_dropped() -> None:
+    """A series is keyed by metric, so a second location would overwrite the first while
+    the report still claimed every row was accepted."""
+    rows = [
+        *hourly_rows("electricity_price", "USD/MWh", [10.0] * 24, location="site_a"),
+        *hourly_rows("electricity_price", "USD/MWh", [99.0] * 24, location="site_b"),
+    ]
+
+    with pytest.raises(DatasetValidationError) as error:
+        ingest_csv(build_csv(rows))
+
+    assert IssueCode.MULTIPLE_LOCATIONS in codes(error.value)
+    assert "site_a" in str(error.value)
+    assert "site_b" in str(error.value)
+
+
+def test_single_location_across_many_rows_is_accepted() -> None:
+    rows = hourly_rows("electricity_price", "USD/MWh", [10.0] * 24, location="site_a")
+    dataset = ingest_csv(build_csv(rows))
+    assert dataset.series[Metric.ELECTRICITY_PRICE].hours == 24
+
+
+def test_accepted_row_count_matches_retained_observations() -> None:
+    """The report must never claim more rows than were actually kept."""
+    rows = [
+        *hourly_rows("electricity_price", "USD/MWh", [10.0] * 24, location="site_a"),
+        *hourly_rows("facility_load", "MWh", [5.0] * 24, location="site_a"),
+    ]
+    dataset = ingest_csv(build_csv(rows))
+
+    retained = sum(series.hours for series in dataset.series.values())
+    assert dataset.report.rows_accepted == retained == 48

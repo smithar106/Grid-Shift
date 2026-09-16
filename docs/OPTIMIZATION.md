@@ -196,10 +196,11 @@ On the development machine (Apple silicon), with `SOLVER_TIME_LIMIT_SECONDS=5`:
 
 | Scenario | Variables | Solve time |
 | --- | --- | --- |
-| 24 hours, 1 workload | 24 | ~4 ms |
-| 24 hours, 10 workloads | 240 | ~4 ms |
-| 168 hours, 100 workloads | 16,800 | ~84 ms |
+| 24 hours, 1 workload | 24 | 1.3 ms |
+| 24 hours, 10 workloads | 240 | 2.1 ms |
+| 168 hours, 100 workloads | 16,800 | 80 ms |
 
-The PRD's target is a 24-hour scenario in under 5 seconds; the observed figure is roughly
-three orders of magnitude inside it. The solver time limit exists as a guardrail against
+The target is a 24-hour scenario in under 5 seconds; the observed figure is roughly three
+orders of magnitude inside it. Figures are the median of seven runs of the full `solve()`
+call. The solver time limit exists as a guardrail against
 pathological inputs, not as a routine constraint.

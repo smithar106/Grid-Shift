@@ -583,6 +583,26 @@ def ingest_csv(
     for observation in observations:
         grouped[(observation.location_id, observation.metric)].append(observation)
 
+    # A series is keyed by metric, because the MVP models one facility. If the file
+    # contains several locations, keying by metric alone would silently overwrite one
+    # location with another while still reporting every row as accepted. Refuse instead.
+    locations = sorted({location_id for location_id, _ in grouped})
+    if len(locations) > 1:
+        raise DatasetValidationError(
+            [
+                *issues,
+                IngestionIssue(
+                    severity=IssueSeverity.ERROR,
+                    code=IssueCode.MULTIPLE_LOCATIONS,
+                    message=(
+                        f"The file contains {len(locations)} locations "
+                        f"({', '.join(locations)}). A dataset describes one facility; "
+                        "upload one file per location."
+                    ),
+                ),
+            ]
+        )
+
     series: dict[Metric, ObservationSeries] = {}
     for (location_id, metric), members in grouped.items():
         unique, contiguous, gaps = _dedupe_and_check_gaps(

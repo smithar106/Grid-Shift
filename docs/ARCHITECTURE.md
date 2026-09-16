@@ -123,13 +123,17 @@ not support `var()`.
 
 ## Testing
 
-| Suite | Count | Scope |
+| Suite | Tests | Scope |
 | --- | --- | --- |
-| `tests/optimization/` | 84 | The model: feasibility, optimality, baseline, edge cases. 100% branch coverage. |
-| `tests/test_csv_ingest.py` | 45 | Ingestion, unit canonicalization, DST, duplicates, gaps |
-| `tests/test_api_*.py` | 60 | HTTP contracts and the end-to-end scenario flow |
+| `tests/optimization/` | 88 | The model: feasibility, optimality, baseline, edge cases. 100% branch coverage. |
+| `tests/test_csv_ingest.py` | 48 | Ingestion, unit canonicalization, DST, duplicates, gaps, multi-location rejection |
+| `tests/test_api_*.py` | 56 | HTTP contracts, guards, and the end-to-end scenario flow |
 | `tests/test_open_meteo.py` | 17 | Connector normalization, caching, failure modes |
+| other API suites | 49 | Scenario assembly, timezone handling, engine wiring, settings, probes |
+| `apps/web/tests/` | 16 | API client and formatting |
 | `tests/optimization/` coverage gate | — | CI fails below 90% |
+
+Overall API statement coverage is 97%.
 
 CI runs Ruff, Mypy, Pytest (with the coverage gate), ESLint, `tsc`, Vitest, and a production
 build for both applications.

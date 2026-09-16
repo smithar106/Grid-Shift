@@ -7,10 +7,12 @@ back would be naive and would silently shift the meaning of an hour.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import Session
 
+from app.models import Base
 from app.models.facility import Facility
 from app.models.types import UtcDateTime
 
@@ -69,3 +71,122 @@ def test_round_trip_through_sqlite_keeps_utc(db_session: Session) -> None:
     assert loaded.created_at.tzinfo is not None
     assert loaded.created_at.utcoffset() == timedelta(0)
     assert loaded.created_at >= moment - timedelta(minutes=1)
+
+
+# --- Engine and session factory -----------------------------------------------------
+# The API's own tests override the session dependency, so the engine wiring that
+# production actually uses is exercised here instead.
+
+
+def test_engine_uses_the_configured_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+    from app.services.db import get_engine, reset_engine_cache
+
+    database = tmp_path / "audit.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database}")
+    get_settings.cache_clear()
+    reset_engine_cache()
+
+    try:
+        engine = get_engine()
+        assert str(engine.url).endswith("audit.db")
+
+        Base.metadata.create_all(engine)
+        with engine.connect() as connection:
+            names = {
+                row[0]
+                for row in connection.exec_driver_sql(
+                    "select name from sqlite_master where type='table'"
+                )
+            }
+        assert {"facilities", "datasets", "scenarios"} <= names
+    finally:
+        reset_engine_cache()
+        get_settings.cache_clear()
+
+
+def test_session_factory_round_trips_a_facility(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.config import get_settings
+    from app.services.db import get_engine, get_session_factory, reset_engine_cache
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'round.db'}")
+    get_settings.cache_clear()
+    reset_engine_cache()
+
+    try:
+        Base.metadata.create_all(get_engine())
+        session = get_session_factory()()
+        try:
+            session.add(
+                Facility(
+                    name="Engine Check",
+                    location_id="facility_engine",
+                    timezone="UTC",
+                    capacity_mw=12.0,
+                )
+            )
+            session.commit()
+            stored = session.query(Facility).one()
+            assert stored.location_id == "facility_engine"
+            assert stored.created_at.utcoffset() == timedelta(0)
+        finally:
+            session.close()
+    finally:
+        reset_engine_cache()
+        get_settings.cache_clear()
+
+
+def test_sqlite_engine_allows_cross_thread_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FastAPI runs sync endpoints in a threadpool; SQLite would otherwise refuse."""
+    import threading
+
+    from app.config import get_settings
+    from app.services.db import get_engine, reset_engine_cache
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'threads.db'}")
+    get_settings.cache_clear()
+    reset_engine_cache()
+
+    try:
+        engine = get_engine()
+        Base.metadata.create_all(engine)
+        errors: list[Exception] = []
+
+        def worker() -> None:
+            try:
+                with engine.connect() as connection:
+                    connection.exec_driver_sql("select 1")
+            except Exception as exc:  # pragma: no cover - failure path
+                errors.append(exc)
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        thread.join()
+        assert errors == []
+    finally:
+        reset_engine_cache()
+        get_settings.cache_clear()
+
+
+def test_get_session_closes_the_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.db import get_session
+
+    closed: list[bool] = []
+
+    class FakeSession:
+        def close(self) -> None:
+            closed.append(True)
+
+    monkeypatch.setattr("app.services.db.get_session_factory", lambda: lambda: FakeSession())
+
+    generator = get_session()
+    session = next(generator)
+    assert isinstance(session, FakeSession)
+
+    with pytest.raises(StopIteration):
+        next(generator)
+    assert closed == [True]

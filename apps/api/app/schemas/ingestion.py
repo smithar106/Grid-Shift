@@ -46,6 +46,7 @@ class IssueCode(StrEnum):
     MISSING_HOUR = "missing_hour"
     CURRENCY_MISMATCH = "currency_mismatch"
     MIXED_SOURCE = "mixed_source"
+    MULTIPLE_LOCATIONS = "multiple_locations"
 
 
 class IngestionIssue(BaseModel):

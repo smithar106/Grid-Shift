@@ -31,15 +31,17 @@ MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 def summarize_dataset(dataset: Dataset) -> list[SeriesSummary]:
     """Recompute per-metric summaries from the stored observations.
 
-    Derived on read rather than stored, so the summary can never disagree with the rows it
-    describes.
+    Grouped by ``(location_id, metric)`` rather than metric alone, so a dataset that
+    somehow holds several locations can never have their timestamps interleaved into one
+    misleading summary. Derived on read rather than stored, so the summary can never
+    disagree with the rows it describes.
     """
-    grouped: dict[str, list[HourlyObservation]] = {}
+    grouped: dict[tuple[str, str], list[HourlyObservation]] = {}
     for observation in dataset.observations:
-        grouped.setdefault(observation.metric, []).append(observation)
+        grouped.setdefault((observation.location_id, observation.metric), []).append(observation)
 
     summaries: list[SeriesSummary] = []
-    for metric, observations in grouped.items():
+    for (_, metric), observations in grouped.items():
         ordered = sorted(observations, key=lambda item: item.timestamp_utc)
         timestamps = [item.timestamp_utc for item in ordered]
         gaps = [

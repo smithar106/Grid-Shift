@@ -353,3 +353,74 @@ def test_explore_does_not_persist_a_result(client: TestClient) -> None:
     client.post(f"/api/v1/scenarios/{scenario['id']}/explore")
 
     assert client.get(f"/api/v1/scenarios/{scenario['id']}/results").status_code == 404
+
+
+# --- Guards and limits --------------------------------------------------------------
+
+
+def test_list_scenarios_returns_newest_first(client: TestClient) -> None:
+    first = setup_scenario(client)
+    facility_id = first["facility_id"]
+    dataset_id = first["dataset_ids"][0]
+
+    second = client.post(
+        "/api/v1/scenarios",
+        json={
+            "facility_id": facility_id,
+            "name": "Second",
+            "objective": "cost",
+            "dataset_ids": [dataset_id],
+            "workloads": [],
+        },
+    ).json()
+
+    response = client.get("/api/v1/scenarios")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 2
+    assert body[0]["id"] == second["id"]
+
+
+def test_workload_limit_is_enforced(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "max_workloads", 1)
+
+    scenario = setup_scenario(
+        client,
+        workloads=[
+            {"job_id": "a", "energy_mwh": 10, "release_hour": 0, "deadline_hour": 5, "max_mw": 5},
+            {"job_id": "b", "energy_mwh": 10, "release_hour": 0, "deadline_hour": 5, "max_mw": 5},
+        ],
+    )
+    response = client.post(f"/api/v1/scenarios/{scenario['id']}/optimize")
+
+    assert response.status_code == 422
+    assert "limit is 1" in response.json()["detail"]
+
+
+def test_horizon_limit_is_enforced(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "max_horizon_hours", 12)
+
+    scenario = setup_scenario(client)
+    response = client.post(f"/api/v1/scenarios/{scenario['id']}/optimize")
+
+    assert response.status_code == 422
+    assert "limit is 12" in response.json()["detail"]
+
+
+def test_busy_solver_returns_503(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """A full solver is reported, not queued silently."""
+    from app.routers import scenarios as scenarios_module
+
+    monkeypatch.setattr(scenarios_module._solver_slots, "acquire", lambda timeout=None: False)
+
+    scenario = setup_scenario(client)
+    response = client.post(f"/api/v1/scenarios/{scenario['id']}/optimize")
+
+    assert response.status_code == 503
+    assert "busy" in response.json()["detail"]
