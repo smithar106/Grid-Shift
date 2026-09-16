@@ -36,7 +36,13 @@ from app.optimization.results import (
     SolverStatus,
 )
 from app.optimization.solver import solve
-from app.schemas.api import ScenarioCreate, ScenarioOut
+from app.schemas.api import (
+    ScenarioCreate,
+    ScenarioOut,
+    TradeoffCurve,
+    TradeoffPoint,
+    TradeoffRequest,
+)
 from app.services.db import get_session
 from app.services.scenario_builder import build_problem
 
@@ -326,6 +332,70 @@ def _as_utc(value: datetime | str) -> datetime:
 def get_results(scenario_id: UUID, session: Session = Depends(get_session)) -> OptimizationResult:
     scenario = _get_scenario(session, scenario_id)
     return result_from_record(_latest_result(session, scenario.id), scenario)
+
+
+@router.post("/{scenario_id}/explore", response_model=TradeoffCurve)
+def explore_tradeoff(
+    scenario_id: UUID,
+    payload: TradeoffRequest | None = None,
+    session: Session = Depends(get_session),
+) -> TradeoffCurve:
+    """Solve the scenario at several carbon prices and return the cost/emissions curve.
+
+    This is the empirical version of the trade-off the product exists to show: each point
+    is a full solve, so the curve is the model's own frontier rather than a smoothed
+    illustration. Nothing is persisted.
+    """
+    scenario = _get_scenario(session, scenario_id)
+    settings = get_settings()
+    prices = (payload or TradeoffRequest()).carbon_prices_usd_per_tco2e
+
+    facility, datasets = _load_inputs(session, scenario)
+    built = build_problem(facility, datasets, list(scenario.workloads))
+
+    if not _solver_slots.acquire(timeout=1.0):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"All {settings.max_concurrent_optimizations} solver slots are busy. Retry shortly."
+            ),
+        )
+
+    try:
+        points: list[TradeoffPoint] = []
+        baseline_cost: float | None = None
+        baseline_emissions: float | None = None
+
+        for price in prices:
+            outcome = solve(
+                built.problem,
+                ObjectiveMode.BALANCED,
+                carbon_price_usd_per_tco2e=price,
+                time_limit_seconds=settings.solver_time_limit_seconds,
+            )
+            baseline_cost = outcome.baseline_total_cost_usd
+            baseline_emissions = outcome.baseline_total_emissions_tco2e
+            points.append(
+                TradeoffPoint(
+                    carbon_price_usd_per_tco2e=price,
+                    status=outcome.status.value,
+                    total_cost_usd=outcome.total_cost_usd,
+                    total_emissions_tco2e=outcome.total_emissions_tco2e,
+                    cost_savings_pct=outcome.cost_savings_pct,
+                    emissions_reduction_pct=outcome.emissions_reduction_pct,
+                )
+            )
+    finally:
+        _solver_slots.release()
+
+    return TradeoffCurve(
+        scenario_id=scenario.id,
+        snapshot_checksum=built.snapshot_checksum,
+        horizon_hours=built.problem.horizon_hours,
+        baseline_total_cost_usd=baseline_cost,
+        baseline_total_emissions_tco2e=baseline_emissions,
+        points=points,
+    )
 
 
 @router.get("/{scenario_id}/export")

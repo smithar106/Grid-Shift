@@ -23,6 +23,9 @@ __all__ = [
     "HealthOut",
     "ScenarioCreate",
     "ScenarioOut",
+    "TradeoffCurve",
+    "TradeoffPoint",
+    "TradeoffRequest",
     "WeatherOut",
     "WeatherPoint",
     "WorkloadInput",
@@ -153,3 +156,50 @@ class WeatherOut(BaseModel):
     #: cooling-load model is explicitly enabled.
     affects_objective: bool = False
     points: list[WeatherPoint]
+
+
+class TradeoffRequest(BaseModel):
+    """Carbon prices to explore. The sweep is a study, not a saved scenario."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    carbon_prices_usd_per_tco2e: list[float] = Field(
+        default_factory=lambda: [0.0, 25.0, 50.0, 100.0, 200.0, 400.0],
+        min_length=2,
+        max_length=25,
+    )
+
+    @field_validator("carbon_prices_usd_per_tco2e")
+    @classmethod
+    def _non_negative(cls, value: list[float]) -> list[float]:
+        if any(price < 0 for price in value):
+            raise ValueError("Carbon prices must be non-negative.")
+        return sorted(set(value))
+
+
+class TradeoffPoint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    carbon_price_usd_per_tco2e: float
+    status: str
+    total_cost_usd: float
+    total_emissions_tco2e: float
+    cost_savings_pct: float | None = None
+    emissions_reduction_pct: float | None = None
+
+
+class TradeoffCurve(BaseModel):
+    """Cost/emissions outcomes across carbon prices — the trade-off made visible.
+
+    Nothing here is persisted: sweeping carbon prices is exploration, and writing a
+    scenario result per point would pollute the user's history with experiments.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_id: UUID
+    snapshot_checksum: str | None
+    horizon_hours: int
+    baseline_total_cost_usd: float | None
+    baseline_total_emissions_tco2e: float | None
+    points: list[TradeoffPoint]

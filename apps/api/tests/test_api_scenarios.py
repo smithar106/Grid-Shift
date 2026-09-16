@@ -299,3 +299,57 @@ def test_zero_workload_scenario_returns_the_fixed_load(client: TestClient) -> No
     assert result["job_allocations"] == {}
     assert all(point["optimized_flexible_mwh"] == 0.0 for point in result["hourly"])
     assert result["cost_savings_pct"] == pytest.approx(0.0)
+
+
+# --- Carbon-price trade-off sweep ---------------------------------------------------
+
+
+def test_explore_returns_a_tradeoff_curve(client: TestClient) -> None:
+    """Each point is a full solve, so the curve is the model's own frontier."""
+    scenario = setup_scenario(client, objective="balanced")
+    response = client.post(
+        f"/api/v1/scenarios/{scenario['id']}/explore",
+        json={"carbon_prices_usd_per_tco2e": [0.0, 50.0, 200.0]},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [point["carbon_price_usd_per_tco2e"] for point in body["points"]] == [0.0, 50.0, 200.0]
+    assert all(point["status"] == "optimal" for point in body["points"])
+    assert body["baseline_total_cost_usd"] is not None
+    assert body["horizon_hours"] == 24
+
+
+def test_explore_higher_carbon_price_never_emits_more(client: TestClient) -> None:
+    """Pricing carbon more highly cannot make the emissions-optimal choice worse."""
+    scenario = setup_scenario(client, objective="balanced")
+    body = client.post(
+        f"/api/v1/scenarios/{scenario['id']}/explore",
+        json={"carbon_prices_usd_per_tco2e": [0.0, 50.0, 500.0]},
+    ).json()
+
+    emissions = [point["total_emissions_tco2e"] for point in body["points"]]
+    assert emissions == sorted(emissions, reverse=True)
+
+
+def test_explore_uses_default_carbon_prices(client: TestClient) -> None:
+    scenario = setup_scenario(client, objective="balanced")
+    body = client.post(f"/api/v1/scenarios/{scenario['id']}/explore").json()
+    assert len(body["points"]) >= 2
+
+
+def test_explore_rejects_negative_carbon_prices(client: TestClient) -> None:
+    scenario = setup_scenario(client, objective="balanced")
+    response = client.post(
+        f"/api/v1/scenarios/{scenario['id']}/explore",
+        json={"carbon_prices_usd_per_tco2e": [-10.0, 20.0]},
+    )
+    assert response.status_code == 422
+
+
+def test_explore_does_not_persist_a_result(client: TestClient) -> None:
+    """A sweep is exploration; it must not pollute the scenario's result history."""
+    scenario = setup_scenario(client, objective="balanced")
+    client.post(f"/api/v1/scenarios/{scenario['id']}/explore")
+
+    assert client.get(f"/api/v1/scenarios/{scenario['id']}/results").status_code == 404
