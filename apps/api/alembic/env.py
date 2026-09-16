@@ -12,7 +12,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from app.config import get_settings
-from app.models import Base  # noqa: F401  (importing the package registers every table)
+from app.models import Base
 from app.models.types import UtcDateTime
 
 config = context.config
