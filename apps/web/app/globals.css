@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  GridShift design tokens.
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  One accent (a desaturated amber, chosen for an energy instrument rather than a
+  marketing page), a warm neutral ramp, and semantic colour for gain/loss. Every colour
+  used in the application resolves through these tokens, so dark mode is a single
+  override block rather than a per-component concern.
+*/
+
+@theme {
+  --color-canvas: #fbfaf9;
+  --color-panel: #ffffff;
+  --color-sunken: #f5f4f1;
+
+  --color-line: #e5e3de;
+  --color-line-strong: #cecbc4;
+
+  --color-ink: #1b1a17;
+  --color-ink-muted: #6a675f;
+  --color-ink-faint: #97938b;
+
+  --color-accent: #b45309;
+  --color-accent-hover: #92400e;
+  --color-accent-soft: #fdf4e8;
+
+  --color-baseline: #a8a29e;
+
+  --color-gain: #15803d;
+  --color-loss: #b91c1c;
+  --color-warn: #a16207;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  @theme {
+    --color-canvas: #14130f;
+    --color-panel: #1c1b17;
+    --color-sunken: #232219;
+
+    --color-line: #302e28;
+    --color-line-strong: #45423a;
+
+    --color-ink: #f2f0ec;
+    --color-ink-muted: #a5a099;
+    --color-ink-faint: #7a766e;
+
+    --color-accent: #f0a049;
+    --color-accent-hover: #f6b56b;
+    --color-accent-soft: #2a2118;
+
+    --color-baseline: #78736c;
+
+    --color-gain: #4ade80;
+    --color-loss: #f87171;
+    --color-warn: #fbbf24;
   }
 }
 
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers line up in columns, which is the whole point of a table of energy data. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+/* Recharts injects a focus outline on the chart surface that is not a real control. */
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
 }

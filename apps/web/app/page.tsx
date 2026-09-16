@@ -1,69 +1,252 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { HourlyChart } from "@/components/HourlyChart";
+import { ResultSummary } from "@/components/ResultSummary";
+import {
+  Alert,
+  Button,
+  DefinitionList,
+  EmptyState,
+  Loading,
+  PageHeader,
+  Panel,
+  Stat,
+  Table,
+  TD,
+  TH,
+} from "@/components/ui";
+import { getResults, listDatasets, listFacilities, listScenarios } from "@/lib/api";
+import {
+  formatDateTime,
+  formatInteger,
+  formatNumber,
+  metricLabel,
+  shortChecksum,
+} from "@/lib/format";
+import type { Dataset, Facility, OptimizationResult, Scenario } from "@/lib/types";
+
+export default function OverviewPage() {
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [result, setResult] = useState<OptimizationResult | null>(null);
+  const [resultScenario, setResultScenario] = useState<Scenario | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [facilityList, datasetList, scenarioList] = await Promise.all([
+          listFacilities(),
+          listDatasets(),
+          listScenarios(),
+        ]);
+        setFacilities(facilityList);
+        setDatasets(datasetList);
+        setScenarios(scenarioList);
+
+        const latest = scenarioList.find((scenario) => scenario.status === "optimized");
+        if (latest) {
+          setResultScenario(latest);
+          try {
+            setResult(await getResults(latest.id));
+          } catch {
+            // A scenario can be marked optimized while its result is unavailable; the
+            // rest of the overview is still useful, so this is not a page-level error.
+            setResult(null);
+          }
+        }
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Load failed");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <Loading label="Loading overview" />;
+
+  const facility = facilities[0] ?? null;
+  const totalHours = datasets.reduce(
+    (sum, dataset) => sum + (dataset.series[0]?.hours ?? 0),
+    0,
+  );
+  const metrics = [...new Set(datasets.flatMap((dataset) => dataset.metrics))].sort();
+
+  const steps = [
+    { done: facilities.length > 0, label: "Create a facility", href: "/data" },
+    { done: datasets.length > 0, label: "Upload hourly price and carbon data", href: "/data" },
+    { done: scenarios.length > 0, label: "Define a scenario with workloads", href: "/optimize" },
+    {
+      done: scenarios.some((scenario) => scenario.status === "optimized"),
+      label: "Run the optimization",
+      href: "/optimize",
+    },
+  ];
+  const allDone = steps.every((step) => step.done);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <PageHeader title="Overview" />
+
+      {error && (
+        <div className="mb-4">
+          <Alert tone="loss" title="Could not reach the API">
+            {error}
+          </Alert>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+      )}
+
+      <div className="flex flex-col gap-8">
+        <Panel>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+            <Stat label="Facilities" value={formatInteger(facilities.length)} />
+            <Stat label="Datasets" value={formatInteger(datasets.length)} />
+            <Stat label="Observed hours" value={formatInteger(totalHours)} />
+            <Stat label="Scenarios" value={formatInteger(scenarios.length)} />
+            <Stat
+              label="Optimized"
+              value={formatInteger(
+                scenarios.filter((scenario) => scenario.status === "optimized").length,
+              )}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+        </Panel>
+
+        {!allDone && (
+          <Panel title="Getting started">
+            <ol className="flex flex-col gap-1.5 text-sm">
+              {steps.map((step) => (
+                <li key={step.label} className="flex items-center gap-2">
+                  <span className={step.done ? "text-gain" : "text-ink-faint"} aria-hidden>
+                    {step.done ? "✓" : "○"}
+                  </span>
+                  {step.done ? (
+                    <span className="text-ink-muted line-through">{step.label}</span>
+                  ) : (
+                    <Link href={step.href} className="text-ink hover:text-accent">
+                      {step.label}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Panel>
+        )}
+
+        {facility && (
+          <Panel
+            title="Facility"
+            action={
+              <Link href="/data">
+                <Button>Manage</Button>
+              </Link>
+            }
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <DefinitionList
+              items={[
+                { term: "Name", value: facility.name },
+                { term: "Location id", value: <span className="tnum font-mono">{facility.location_id}</span> },
+                {
+                  term: "Capacity",
+                  value: <span className="tnum font-mono">{formatNumber(facility.capacity_mw)} MW</span>,
+                },
+                { term: "Timezone", value: facility.timezone },
+                {
+                  term: "Coordinates",
+                  value:
+                    facility.latitude !== null && facility.longitude !== null
+                      ? `${facility.latitude.toFixed(3)}, ${facility.longitude.toFixed(3)}`
+                      : "—",
+                },
+              ]}
+            />
+          </Panel>
+        )}
+
+        <Panel
+          title="Data coverage"
+          action={
+            <Link href="/data">
+              <Button>Upload</Button>
+            </Link>
+          }
+        >
+          {datasets.length === 0 ? (
+            <EmptyState>No data uploaded. GridShift needs hourly prices and carbon intensity.</EmptyState>
+          ) : (
+            <>
+              <Table>
+                <thead>
+                  <tr>
+                    <TH>Metrics</TH>
+                    <TH align="right">Hours</TH>
+                    <TH>Window</TH>
+                    <TH>Integrity</TH>
+                    <TH>Checksum</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datasets.slice(0, 5).map((dataset) => {
+                    const first = dataset.series[0];
+                    return (
+                      <tr key={dataset.id}>
+                        <TD>{dataset.metrics.map(metricLabel).join(", ")}</TD>
+                        <TD align="right" numeric>
+                          {first?.hours ?? "—"}
+                        </TD>
+                        <TD>
+                          {first
+                            ? `${formatDateTime(first.start_utc)} → ${formatDateTime(first.end_utc)}`
+                            : "—"}
+                        </TD>
+                        <TD>
+                          {dataset.series.every((series) => series.is_contiguous) ? (
+                            <span className="text-gain">contiguous</span>
+                          ) : (
+                            <span className="text-warn">has gaps</span>
+                          )}
+                        </TD>
+                        <TD numeric>{shortChecksum(dataset.checksum)}</TD>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+              {metrics.length > 0 && (
+                <p className="mt-3 text-xs text-ink-muted">
+                  Metrics available: {metrics.map(metricLabel).join(", ")}
+                </p>
+              )}
+            </>
+          )}
+        </Panel>
+
+        <Panel
+          title={resultScenario ? `Latest result — ${resultScenario.name}` : "Latest result"}
+          action={
+            <Link href="/optimize">
+              <Button variant="primary">Optimize</Button>
+            </Link>
+          }
+        >
+          {result ? (
+            <div className="flex flex-col gap-6">
+              <ResultSummary result={result} />
+              {result.hourly.length > 0 && <HourlyChart points={result.hourly} />}
+            </div>
+          ) : (
+            <EmptyState>
+              No optimization has been run yet. Build a scenario on the Optimize screen to
+              see the baseline comparison here.
+            </EmptyState>
+          )}
+        </Panel>
+      </div>
+    </>
   );
 }
