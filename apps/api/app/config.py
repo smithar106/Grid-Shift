@@ -2,30 +2,19 @@
 
 All settings are supplied through environment variables so that the same image can run
 locally, in CI, and on Railway without modification.
+
+Note: list-like settings are declared as plain strings with parsed accessors. Pydantic
+Settings attempts to JSON-decode complex (list/dict) annotations straight from the
+environment before validators run, which would reject the comma-separated form that
+Railway and .env files naturally provide.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated
 
-from pydantic import BeforeValidator, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-def _split_csv(value: object) -> object:
-    """Accept either a JSON list or a comma-separated string for list settings."""
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return []
-        if stripped.startswith("["):
-            return value
-        return [item.strip() for item in stripped.split(",") if item.strip()]
-    return value
-
-
-CsvList = Annotated[list[str], BeforeValidator(_split_csv)]
 
 
 class Settings(BaseSettings):
@@ -38,9 +27,9 @@ class Settings(BaseSettings):
     # Persistence. Railway injects DATABASE_URL for the attached Postgres service.
     database_url: str = "sqlite:///./gridshift.db"
 
-    # Browser origins allowed to call the API directly. The Next.js server proxies
-    # same-origin requests, so this only needs to cover direct/dev access.
-    cors_origins: CsvList = Field(default_factory=lambda: ["http://localhost:3000"])
+    # Comma-separated browser origins allowed to call the API directly. The Next.js
+    # server proxies same-origin requests, so this only needs to cover direct/dev access.
+    cors_origins: str = "http://localhost:3000"
 
     # External data
     open_meteo_base_url: str = "https://api.open-meteo.com/v1/forecast"
@@ -52,6 +41,10 @@ class Settings(BaseSettings):
     max_workloads: int = 200
     max_horizon_hours: int = 168
     max_concurrent_optimizations: int = 4
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def is_production(self) -> bool:
